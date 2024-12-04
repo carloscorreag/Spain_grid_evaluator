@@ -108,25 +108,25 @@ Ejemplo de contenido de stations_data_temperature.csv:
 
 No se recomienda incluir en el CSV estaciones con gran proporción de días sin dato. En caso de no tener dato para un día concreto se puede o bien dejar en blanco el dato de la variable como en este ejemplo para el día 1991-01-02:
 
-  1,35.6895,139.6917,1991-01-01,25.0
-  1,35.6895,139.6917,1991-01-02,
-  1,35.6895,139.6917,1991-01-03,29.0
-  ...
+	1,35.6895,139.6917,1991-01-01,25.0
+	1,35.6895,139.6917,1991-01-02,
+	1,35.6895,139.6917,1991-01-03,29.0
+	...
 
 o bien no incluir dicho día (se pasa del 1991-01-01 al 1991-01-03 directamente):
 
-  1,35.6895,139.6917,1991-01-01,25.0
-  1,35.6895,139.6917,1991-01-03,29.0
-  1,35.6895,139.6917,1991-01-04,22.6
-  ...
+	1,35.6895,139.6917,1991-01-01,25.0
+	1,35.6895,139.6917,1991-01-03,29.0
+	1,35.6895,139.6917,1991-01-04,22.6
+	...
 
 # Descripción del Programa
 
-El programa consta de una GUI en la que el usuario selecciona:
+El programa consta de una GUI en la que el/la usuario/a selecciona:
 
 1) la variable que contiene el CSV de las estaciones que se van a comparar con las rejillas almacenadas en netCDF. El programa carga los datos de las rejillas desde archivos netCDF y los datos de las estaciones desde archivos CSV.
-2) los grids que desea evaluar que está.
-3) el periodo de evaluación a través del año de inicio y el año final. Si ninguna de las fechas incluidas en el CSV está incluída en el periodo seleccionado en la GUI el script dará un error.
+2) las rejillas que desea evaluar.
+3) el periodo de evaluación mediante el año de inicio y el año final. Si ninguna de las fechas incluidas en el CSV no está incluída en el periodo seleccionado en la GUI, el script dará un error.
 4) pulsar el botón para generar los resultados.
 
 A continuación, el script calcula métricas de diferencia entre los valores interpolados de las rejillas y los valores observados en las estaciones. Las métricas calculadas incluyen sesgo diario medio, error absoluto diario medio, sesgo en percentiles de las series diarias, RMSE de las series diarias, coeficiente de correlación, sesgo de varianza, ciclo anual y otros.
