@@ -33,7 +33,7 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 	# Cargar datos de estaciones (archivo de ejemplo 'stations_data.csv')
 	print('loading stations CSV data...')
 	try:
-		stations_data_0 = pd.read_csv('/MASIVO/cld/Spain_grid_evaluator_HR_2009_2018/stations_data_' + selected_variable + '.csv')
+		stations_data_0 = pd.read_csv('stations_data_' + selected_variable + '.csv')
 		stations_data_0['date'] = pd.to_datetime(stations_data_0['date'])
 		# Filtrar por el periodo especificado
 		stations_data_0 = stations_data_0[(stations_data_0['date'].dt.year >= start_year) & (stations_data_0['date'].dt.year <= end_year)]
@@ -51,7 +51,7 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 		print('loading netCDF grid data...')
 		
 		try:
-			grid_file = '/MASIVO/cld/Spain_grid_evaluator_HR_2009_2018/grid_data_' + grid + '_' + selected_variable + '.nc'
+			grid_file = 'grid_data_' + grid + '_' + selected_variable + '.nc'
 			grid_data = nc.Dataset(grid_file)
 
 		except:
