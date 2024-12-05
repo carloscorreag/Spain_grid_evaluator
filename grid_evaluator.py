@@ -176,14 +176,12 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 		def extract_interpolated_grid_value(lat, lon, date):
 			time_idx = convert_time_to_index(grid_time, date)
 			try: 
-				
 				interpolator = create_interpolator(grid_targetvar, grid_lat, grid_lon, lat, lon, int(time_idx))
 				interpolated_value = interpolator((lat, lon)) #interpolator((time_idx, lat, lon))
 				return interpolated_value
 			except:
 				print(np.nan)
 				return np.nan	
-			#interpolator = create_interpolator(grid_targetvar, grid_lat, grid_lon, lat, lon, int(time_idx))
 			
 			
 		print('data loaded')
