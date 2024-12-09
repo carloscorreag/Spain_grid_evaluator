@@ -46,7 +46,7 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 		
 	for grid in selected_grids:
 		stations_data = stations_data_0 # se crea un nuevo dataframe que contiene los datos de las estaciones del CSV 
-		# Cargar datos de la rejilla (ISIMIP-CHELSA, CHIRTS, CHIRPS, ERA5 y ERA5-land) usando netCDF4
+		# Cargar datos de la rejilla (ISIMIP-CHELSA, CHIRTS, CHIRPS, ERA5, ERA5-land, 'COSMO-REA6', 'CERRA', 'EOBS') usando netCDF4
 		print(grid)
 		print('loading netCDF grid data...')
 		
@@ -151,7 +151,6 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 			time_idx = np.interp(time_num, time_array, np.arange(len(time_array)))
 			return time_idx
 
-		
 		# Crear el interpolador para los datos de la rejilla 
 		def create_interpolator(targetvar_data, lat_array, lon_array, lat_station, lon_station, time_idx):
 			lat_array = np.sort(np.unique(lat_array))
@@ -182,7 +181,7 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 			except:
 				print(np.nan)
 				return np.nan	
-			
+			#interpolator = create_interpolator(grid_targetvar, grid_lat, grid_lon, lat, lon, int(time_idx))
 			
 		print('data loaded')
 		
@@ -291,7 +290,6 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 				'Correlation': correlation,
 				'Variance Bias': variance_bias
 			})
-                
 		def calculate_metrics_interpolated_humidity(data):
 			data = data.dropna()  # Eliminar filas con NaN si es necesario
 			if len(data) < 2:
@@ -399,7 +397,6 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 			metrics_per_station_interpolated.to_csv('metrics_per_station_interpolated_' + grid + '_' + selected_variable + '.csv', index=False)
 			print('metrics_per_station_interpolated_' + grid + '_' + selected_variable + '.csv has been saved')
 
-
 		elif selected_variable == 'humidity':
 			metrics_per_station_interpolated = stations_data.groupby('station_id').apply(calculate_metrics_interpolated_humidity).reset_index()
                         # Guardar métricas para cada estación en un csv
@@ -420,7 +417,7 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 			print(f'Error: variable {selected_variable} no contemplada para el cálculo de métricas.')
 			continue
 
-		# Calcular el ciclo anual
+		# Calcular el ciclo anual del grid
 		
 		dfac = stations_data.dropna()
 		dfac['month'] = dfac['date'].dt.month
@@ -461,7 +458,44 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 		del stations_data
 		del stations_data_accu_ini
 		del dfac
+	
+	# Calcular el ciclo anual de las observaciones
+	
+	stations_data_0['month'] = stations_data_0['date'].dt.month
+	stations_data_0[selected_variable] = stations_data_0[selected_variable].astype(float)
+	# Agrupar por mes y calcular el ciclo anual promediando con todas las estaciones observacionales
+	if selected_variable != 'precipitation':
+		# Paso 1: Calcular la media mensual por estación
+		station_monthly_obs = stations_data_0.groupby(['station_id', 'month']).agg({
+			selected_variable: 'mean',
+			'interpolated_grid_value': 'mean'
+		}).reset_index()
+			
+		# Paso 2: Calcular la media mensual global entre estaciones
+		monthly_avg_obs = station_monthly_obs.groupby('month').agg({
+			selected_variable: 'mean',
+			'interpolated_grid_value': 'mean'
+		}).reset_index()
+	else:
+		# Paso 1: Calcular la suma mensual por estación
+		station_monthly_obs = stations_data_0.groupby(['station_id', 'month']).agg({
+			selected_variable: 'sum',
+			'interpolated_grid_value': 'sum'
+		}).reset_index()
 		
+		# Paso 2: Dividir por el número de años en el periodo de análisis
+		num_years = stations_data_0['date'].nunique() / 365  
+		station_monthly_obs[selected_variable] /= num_years
+		
+		# Paso 3: Calcular la media mensual global entre todas las estaciones
+		monthly_avg_obs = station_monthly_obs.groupby('month').agg({
+			selected_variable: 'mean',
+			'interpolated_grid_value': 'mean'
+		}).reset_index()
+	# Exportar a CSV
+	monthly_avg_obs.to_csv(selected_variable + '_' + grid + '_annual_cycle_obs.csv', index=False)
+	
+	
 	# Diccionario para almacenar los datos de métricas
 	metrics_data_dict = {}
 	# Diccionario para almacenar los datos del ciclo anual
@@ -471,15 +505,20 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 	for grid in selected_grids:  
 		file_name = f'metrics_per_station_interpolated_{grid}_{selected_variable}.csv'
 		file_name_annual_cycle = selected_variable + '_' + grid + '_annual_cycle_comparison.csv'
+		
 		try:
 			metrics_data = pd.read_csv(file_name)
 			metrics_data_dict[grid] = metrics_data
 			
 			annual_cycle_data = pd.read_csv(file_name_annual_cycle)
-			annual_cycle_dict[grid] = annual_cycle_data 
+			annual_cycle_dict[grid] = annual_cycle_data
 			
 		except FileNotFoundError:
 			print(f'Warning: No metrics file found for {grid} and {selected_variable}')
+	
+	# Cargar el ciclo anual de las observaciones desde su CSV
+	file_name_annual_cycle_obs = selected_variable + '_' + grid + '_annual_cycle_obs.csv'
+	annual_cycle_data_obs = pd.read_csv(file_name_annual_cycle_obs)
 
 	# Verificar los datos cargados
 	for grid, metrics_data in metrics_data_dict.items():
@@ -520,7 +559,7 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
  
 	# Graficar el ciclo anual
 	plt.figure(figsize=(12, 6))
-	plt.plot(annual_cycle_dict[grid]['month'], annual_cycle_dict[grid][selected_variable], label= 'observations', marker='o', color='black')
+	plt.plot(annual_cycle_dict[grid]['month'], annual_cycle_data_obs[selected_variable], label= 'observations', marker='o', color='black')
 	for grid in selected_grids:
 		plt.plot(annual_cycle_dict[grid]['month'], annual_cycle_dict[grid]['interpolated_grid_value'], label= grid, marker='o')
 	# Configurar el gráfico
