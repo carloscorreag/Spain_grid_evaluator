@@ -60,9 +60,17 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 			          
 		# Definir nombres de variables
 		names = variables_name_nc(grid_file)
-
+		
 		if grid in ['ERA5-Land'] and selected_variable in ['precipitation']:
 			targetvar = [string for string in names if string in ['tp']][0]
+		if grid in ['EOBS_HR'] and selected_variable in ['precipitation']:
+			targetvar = [string for string in names if string in ['rr']][0]
+		if grid in ['EOBS_LR'] and selected_variable in ['precipitation']:
+			targetvar = [string for string in names if string in ['rr']][0]
+		if grid in ['ERA5'] and selected_variable in ['precipitation']:
+			targetvar = [string for string in names if string in ['tp']][0]
+		if grid in ['CERRA'] and selected_variable in ['precipitation']:
+			targetvar = [string for string in names if string in ['var61']][0]	
 		if grid == 'COSMO-REA6' and selected_variable == 'wind_speed':
     			targetvar = [string for string in names if string == 'var33'][0]
 		if grid == 'COSMO-REA6' and selected_variable == 'humidity':
@@ -83,7 +91,6 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 		targetlon = [string for string in names if 'lon' in string][0]
 		targettime = [string for string in names if string in ['time', 'valid_time']][0]
 		
-		
 		# Variables dentro del archivo netCDF y conversión de las unidades
 		grid_lat = grid_data.variables[targetlat][:]
 		grid_lon = grid_data.variables[targetlon][:]
@@ -100,7 +107,7 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 				units = 'days since 1980-01-01 00:00:00'
 			else:
 				print('Error - units not found in netCDF metadata')
-				
+		
 		if selected_variable in ['temperature', 'maximum_temperature', 'minimum_temperature'] and grid not in ['CHIRTS', 'ERA5']:
 			grid_targetvar = grid_data.variables[targetvar][:].astype('float32') - 273.15 # convierte grados Kelvin a grados Celsius
 		elif selected_variable in ['temperature', 'maximum_temperature', 'minimum_temperature'] and grid in ['CHIRTS', 'ERA5']:
@@ -109,9 +116,11 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 			grid_targetvar = grid_data.variables[targetvar][:].astype('float32') # mantiene las unidades de viento
 		elif selected_variable in ['wind_speed'] and grid in ['COSMO-REA6']:
 			grid_targetvar = grid_data.variables[targetvar][:][:,0,:,:].astype('float32') # mantiene las unidades de viento y pasa de 4D a 3D
-		elif selected_variable == 'precipitation' and grid != 'CHIRPS' and grid != 'ISIMIP-CHELSA':
+		elif selected_variable == 'precipitation' and grid not in ['ISIMIP-CHELSA', 'CHIRPS', 'CERRA']:
 			grid_targetvar = grid_data.variables[targetvar][:].astype('float32')*1000 # convierte m/día a mm/día
-		elif selected_variable == 'precipitation' and grid == 'CHIRPS':
+		elif selected_variable == 'precipitation' and grid == 'CERRA':
+			grid_targetvar = grid_data.variables[targetvar][:][:,0,:,:].astype('float32')*1000 # convierte m/día a mm/día y pasa de 4D a 3D
+		elif selected_variable == 'precipitation' and grid in ['CHIRPS']:
 			grid_targetvar = grid_data.variables[targetvar][:].astype('float32') # mantiene las unidades en mm/día
 		elif selected_variable == 'precipitation' and grid == 'ISIMIP-CHELSA':
 			grid_targetvar = grid_data.variables[targetvar][:].astype('float32')*86400 # convierte kg/m²s a mm/día
@@ -160,8 +169,25 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 
 			# Definir rangos para interpolación local
 			lat_range = lat_array[max(0, lat_idx-1):min(len(lat_array), lat_idx+2)]
-			lon_range = lon_array[max(0, lon_idx-1):min(len(lon_array), lon_idx+2)]		
+			lon_range = lon_array[max(0, lon_idx-1):min(len(lon_array), lon_idx+2)]	
 			targetvar_range = targetvar_data[time_idx, max(0, lat_idx-1):min(len(lat_array), lat_idx+2), max(0, lon_idx-1):min(len(lon_array), lon_idx+2)]	
+			
+			# Comprobar y manejar `np.nan` en targetvar_range. Si todos son `np.nan`, devuelve `np.nan`
+			if np.isnan(targetvar_range).all():
+				targetvar_range[:] = np.nan  # Por ejemplo, rellena todo con ceros
+				
+			# Comprobar y manejar `np.nan` en targetvar_range. Si hay solamente algún `np.nan`, lo rellena con el valor válido más cercano al centro
+			if np.isnan(targetvar_range).any() and not np.isnan(targetvar_range).all():
+				center_idx = (targetvar_range.shape[0] // 2, targetvar_range.shape[1] // 2)  # Centro aproximado
+				valid_mask = ~np.isnan(targetvar_range)  # Máscara de valores válidos (no-NaN)
+				valid_indices = np.argwhere(valid_mask)  # Índices de valores válidos
+				
+				# Distancia al centro desde los valores válidos
+				distances = np.linalg.norm(valid_indices - np.array(center_idx), axis=1)
+				closest_valid_idx = valid_indices[distances.argmin()]  # Índice del valor más cercano válido
+				
+				# Rellenar NaN con el valor más cercano válido
+				targetvar_range[~valid_mask] = targetvar_range[tuple(closest_valid_idx)]
 			
 			return RegularGridInterpolator(
 				(lat_range, lon_range), # (np.arange(len(grid_time)), lat_range, lon_range),
@@ -179,9 +205,7 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 				interpolated_value = interpolator((lat, lon)) #interpolator((time_idx, lat, lon))
 				return interpolated_value
 			except:
-				print(np.nan)
 				return np.nan	
-			#interpolator = create_interpolator(grid_targetvar, grid_lat, grid_lon, lat, lon, int(time_idx))
 			
 		print('data loaded')
 		
@@ -599,7 +623,7 @@ def on_generate_button_click():
 
 # Variables y lista de rejillas
 variables = ['temperature', 'maximum_temperature', 'minimum_temperature', 'precipitation', 'wind_speed','humidity']
-grids = ['ISIMIP-CHELSA', 'CHIRTS', 'CHIRPS', 'ERA5', 'ERA5-Land', 'COSMO-REA6', 'CERRA', 'EOBS']
+grids = ['ISIMIP-CHELSA', 'CHIRTS', 'CHIRPS', 'ERA5', 'ERA5-Land', 'COSMO-REA6', 'CERRA','CERRA-Land', 'EOBS', 'EOBS_HR', 'EOBS_LR']
 
 # Crear la GUI
 root = tk.Tk()
