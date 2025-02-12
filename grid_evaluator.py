@@ -98,7 +98,7 @@ def compute_SEEPS(observed, forecast, dry_threshold=0.25, wet_threshold=None, p_
 	Calcula el índice SEEPS para evaluar la calidad del pronóstico de precipitación.
 	"""
 	if len(observed) != len(forecast):
-		raise ValueError("Las series de observación y forecast deben tener la misma longitud.")
+		raise ValueError("Las series de observación y pronóstico deben tener la misma longitud.")
 	
 	def categorize(precip, dry_thr, wet_thr):
 		return np.where(precip < dry_thr, 0, np.where(precip < wet_thr, 1, 2))
@@ -869,7 +869,7 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 			selected_variable: 'mean'
 		}).reset_index()
 	# Exportar a CSV
-	monthly_avg_obs.to_csv(selected_variable + '_' + grid + '_annual_cycle_obs.csv', index=False)
+	monthly_avg_obs.to_csv(selected_variable + '_annual_cycle_obs.csv', index=False)
 
 
 	# Diccionario para almacenar los datos de métricas
@@ -929,7 +929,7 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 			print(f'Warning: No metrics file found for {grid} and {selected_variable}')
 	
 	# Cargar el ciclo anual de las observaciones desde su CSV
-	file_name_annual_cycle_obs = selected_variable + '_' + grid + '_annual_cycle_obs.csv'
+	file_name_annual_cycle_obs = selected_variable + '_annual_cycle_obs.csv'
 	annual_cycle_data_obs = pd.read_csv(file_name_annual_cycle_obs)
 
 	# Verificar los datos cargados
