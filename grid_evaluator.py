@@ -491,7 +491,7 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 				#print('hola')
 				stations_data_filter = stations_data[(stations_data['latitude'] == lat_station) & (stations_data['longitude'] == lon_station) & (stations_data['date'] == date)]
 				#print(stations_data_filter)
-				stations_data_value = stations_data_filter["precipitation"].iloc[0]
+				stations_data_value = stations_data_filter[selected_variable].iloc[0]
 				#print(stations_data_value)
 				closest_idx_value = np.unravel_index(np.abs(targetvar_range - stations_data_value).argmin(), targetvar_range.shape)
 				closest_value = targetvar_range[closest_idx_value]
