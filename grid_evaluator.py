@@ -447,7 +447,10 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 			# Hacer la interpolación si las diferencias son menores o iguales a 24 horas
 			time_idx = np.interp(time_num, time_array, np.arange(len(time_array)))
 			
-			return round(time_idx)
+			if grid in ['CERRA','CERRA_LAND'] and selected_variable == 'precipitation':
+				return int(time_idx)
+			else:
+				return round(time_idx)
 			
 
 		# Crear el interpolador para los datos de la rejilla 
