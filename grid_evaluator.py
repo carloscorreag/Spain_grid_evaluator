@@ -63,11 +63,12 @@ def relaxation15(grid):
 		c = 9
 	elif grid in [ 'HCLIM_IBERIAxxm_40', 'HCLIM_IBERIAxm_40', 'CERRA','CERRA_LAND', 'COSMO-REA6']:
 		c = 3
-	elif grid in [ 'ERA5','ERA5-Land','EOBS_LR', 'EOBS_HR' ]:
+	elif grid in [ 'ERA5','ERA5-Land','EOBS_LR', 'EOBS_HR','CLARA-A3']:
 		c = 2
 	else:
 		c = 2
 	return c
+
 # Función para recortar dataframes 
 def sellatlonbox_dataframe(df, latitudes, longitudes):
 	"""
@@ -180,7 +181,7 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 	# Cargar datos de estaciones (archivo de ejemplo 'stations_data.csv')
 	print('loading stations CSV data...')
 	try: 
-		stations_data_0 = pd.read_csv('stations_data_' + selected_variable + '.csv')
+		stations_data_0 = pd.read_csv('/MASIVO/cld/resultados_cld_20250212/stations_data_' + selected_variable + '.csv')
 		stations_data_0['date'] = pd.to_datetime(stations_data_0['date'])
 		
 		# Filtrar por el periodo especificado
@@ -323,7 +324,7 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 		
 		try:
 			 
-			grid_file = 'grid_data_' + grid + '_' + selected_variable + '.nc'
+			grid_file = '/MASIVO/cld/resultados_cld_20250212/grid_data_' + grid + '_' + selected_variable + '.nc'
 			grid_data = nc.Dataset(grid_file)
 
 		except:
@@ -408,6 +409,10 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 			grid_targetvar = grid_data.variables[targetvar][:].astype('float32')# mantiene las unidades de humedad
 		elif selected_variable in ['humidity'] and grid in ['COSMO-REA6']:
 			grid_targetvar = grid_data.variables[targetvar][:][:,0,:,:].astype('float32') # mantiene las unidades de humedad y pasa de 4D a 3D
+		elif selected_variable in ['radiation'] and grid not in ['COSMO-REA6']:
+			grid_targetvar = grid_data.variables[targetvar][:].astype('float32') # mantiene las unidades de radiación
+		elif selected_variable in ['radiation'] and grid in ['COSMO-REA6']:
+			grid_targetvar = grid_data.variables[targetvar][:][:,0,:,:].astype('float32') # mantiene las unidades de radiación y pasa de 4D a 3D
 		else:
 			print('Error - units')
 			exit()
@@ -490,7 +495,7 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 				# Rellenar NaN con el valor más cercano válido
 				targetvar_range[~valid_mask] = targetvar_range[tuple(closest_valid_idx)]
 			
-			if interpolation_method == '15km relaxation' and grid not in ['ERA5', 'EOBS_LR']:
+			if interpolation_method == '15km relaxation' and grid not in ['ERA5', 'EOBS_LR', 'CLARA-A3']:
 				#print('hola')
 				stations_data_filter = stations_data[(stations_data['latitude'] == lat_station) & (stations_data['longitude'] == lon_station) & (stations_data['date'] == date)]
 				#print(stations_data_filter)
@@ -501,7 +506,7 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 				#print(closest_value)
 				#exit()
 				return closest_value
-			elif interpolation_method == '15km relaxation' and grid in ['ERA5', 'EOBS_LR']:
+			elif interpolation_method == '15km relaxation' and grid in ['ERA5', 'EOBS_LR','CLARA-A3']:
 				return RegularGridInterpolator(
 					(lat_range, lon_range),
 					targetvar_range,
@@ -523,10 +528,11 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 			time_idx = convert_time_to_index(grid_time, date)
 			try: 
 				
-				if interpolation_method == '15km relaxation' and grid not in ['ERA5', 'EOBS_LR']:
+				if interpolation_method == '15km relaxation' and grid not in ['ERA5', 'EOBS_LR','CLARA-A3']:
 					interpolated_value  = create_interpolator(grid_targetvar, grid_lat, grid_lon, lat, lon, time_idx,interpolation_method, date)
 					if selected_variable == 'precipitation' and interpolated_value < 0:
 						interpolated_value = 0
+					print(interpolated_value)
 					return interpolated_value
 				else:
 					interpolator = create_interpolator(grid_targetvar, grid_lat, grid_lon, lat, lon, time_idx,interpolation_method, date)
@@ -617,7 +623,37 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 				'Correlation': correlation,
 				'Variance Bias': variance_bias
 			})
-
+		
+		def calculate_metrics_interpolated_radiation(data):
+			data = data.dropna()  # Eliminar filas con NaN si es necesario
+			if len(data) < 2:
+				return pd.Series({
+					'Mean Bias': np.nan,
+					'Mean Absolute Error': np.nan,
+					'RMSE': np.nan,
+					'Correlation': np.nan,
+					'Variance Bias': np.nan
+				})
+			mean_bias = data['difference_interpolated'].mean()
+			mean_absolute_error = data['difference_interpolated'].abs().mean()
+			rmse = np.sqrt((data['difference_interpolated'] ** 2).mean())
+			correlation, _ = pearsonr(data['interpolated_grid_value'], data[selected_variable])
+			variance_bias = data['interpolated_grid_value'].var() - data[selected_variable].var()
+			percentile90_bias = np.percentile(data['interpolated_grid_value'], 90) - np.percentile(data[selected_variable], 90)
+			percentile10_bias = np.percentile(data['interpolated_grid_value'], 10) - np.percentile(data[selected_variable], 10)
+			percentile95_bias = np.percentile(data['interpolated_grid_value'], 95) - np.percentile(data[selected_variable], 95)
+			
+			return pd.Series({
+				'Mean Bias': mean_bias,
+				'P95 Bias': percentile95_bias,
+				'P90 Bias': percentile90_bias,
+				'P10 Bias': percentile10_bias,
+				'Mean Absolute Error': mean_absolute_error,
+				'RMSE': rmse,
+				'Correlation': correlation,
+				'Variance Bias': variance_bias
+			})
+		
 		def calculate_metrics_interpolated_precip(data):
 			data = data.dropna()  # Eliminar filas con NaN si es necesario
 			if len(data) < 2:
@@ -735,7 +771,24 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 				'Correlation': 'Dimensionless',
 				'Variance Bias': 'm²/s²'
 			}
-			
+		
+		elif selected_variable == 'radiation':
+			metrics_per_station_interpolated = stations_data.groupby('station_id').apply(calculate_metrics_interpolated_wspeed).reset_index()
+			# Guardar métricas para cada estación en un csv
+			metrics_per_station_interpolated.to_csv('metrics_per_station_interpolated_' + grid + '_' + selected_variable + '.csv', index=False)
+			print('metrics_per_station_interpolated_' + grid + '_' + selected_variable + '.csv has been saved')	
+			units = {
+				'Mean Bias': 'J/m²',
+				'P95 Bias': 'J/m²',
+				'P90 Bias': 'J/m²',
+				'P10 Bias': 'J/m²',
+				'Mean Absolute Error': 'J/m²',
+				'RMSE': 'J/m²',
+				'Correlation': 'Dimensionless',
+				'Variance Bias': 'J²/m⁴'
+			}
+		
+		
 		elif selected_variable == 'precipitation':
 			metrics_per_station_interpolated = stations_data.groupby('station_id').apply(calculate_metrics_interpolated_precip).reset_index()
 			# Guardar métricas para cada estación en un csv
@@ -786,6 +839,7 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 			print('metrics_per_station_interpolated_' + grid + '_' + selected_variable + '.csv has been saved')
 
 		elif selected_variable == 'humidity':
+			print(stations_data.groupby('station_id').apply(calculate_metrics_interpolated_humidity))
 			metrics_per_station_interpolated = stations_data.groupby('station_id').apply(calculate_metrics_interpolated_humidity).reset_index()
                         # Guardar métricas para cada estación en un csv
 			metrics_per_station_interpolated.to_csv('metrics_per_station_interpolated_' + grid + '_' + selected_variable + '.csv', index=False)
@@ -986,6 +1040,8 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 		plt.ylabel(selected_variable + ' (m/s)')
 	elif selected_variable == 'humidity':
 		plt.ylabel(selected_variable + ' (%)')
+	elif selected_variable == 'radiation':
+		plt.ylabel(selected_variable + ' (J/m²)')
 	else:
 		plt.ylabel(selected_variable + ' (°C)')
 	plt.title('Average Annual Cycle')
@@ -1025,7 +1081,7 @@ def on_generate_button_click():
 	
 # Variables y lista de rejillas
 variables = ['temperature', 'maximum_temperature', 'minimum_temperature', 'precipitation', 'wind_speed', 'humidity']
-grids = ['HCLIM_IBERIAxm_40', 'HCLIM_IBERIAxxm_40', 'HCLIM_IBERIAxxs_10', 'ISIMIP-CHELSA', 'CHIRTS', 'CHIRPS', 'ERA5', 'ERA5-Land', 'COSMO-REA6', 'CERRA', 'CERRA_LAND', 'EOBS', 'EOBS_HR', 'EOBS_LR']
+grids = ['HCLIM_IBERIAxm_40', 'HCLIM_IBERIAxxm_40', 'HCLIM_IBERIAxxs_10', 'ISIMIP-CHELSA', 'CHIRTS', 'CHIRPS', 'ERA5', 'ERA5-Land', 'COSMO-REA6', 'CERRA', 'CERRA_LAND', 'EOBS', 'EOBS_HR', 'EOBS_LR', 'CLARA-A3']
 months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 
 
