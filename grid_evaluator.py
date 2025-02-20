@@ -773,7 +773,7 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 			}
 		
 		elif selected_variable == 'radiation':
-			metrics_per_station_interpolated = stations_data.groupby('station_id').apply(calculate_metrics_interpolated_wspeed).reset_index()
+			metrics_per_station_interpolated = stations_data.groupby('station_id').apply(calculate_metrics_interpolated_radiation).reset_index()
 			# Guardar métricas para cada estación en un csv
 			metrics_per_station_interpolated.to_csv('metrics_per_station_interpolated_' + grid + '_' + selected_variable + '.csv', index=False)
 			print('metrics_per_station_interpolated_' + grid + '_' + selected_variable + '.csv has been saved')	
@@ -839,7 +839,6 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 			print('metrics_per_station_interpolated_' + grid + '_' + selected_variable + '.csv has been saved')
 
 		elif selected_variable == 'humidity':
-			print(stations_data.groupby('station_id').apply(calculate_metrics_interpolated_humidity))
 			metrics_per_station_interpolated = stations_data.groupby('station_id').apply(calculate_metrics_interpolated_humidity).reset_index()
                         # Guardar métricas para cada estación en un csv
 			metrics_per_station_interpolated.to_csv('metrics_per_station_interpolated_' + grid + '_' + selected_variable + '.csv', index=False)
