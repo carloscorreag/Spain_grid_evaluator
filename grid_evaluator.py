@@ -57,9 +57,21 @@ def get_lat_lon(dataset):
 
 	return np.array(lat), np.array(lon)  # Asegurar que se devuelve como arrays de NumPy
 
+
+def find_nearest_idx_wrf(lat_target, lon_target, XLAT, XLONG):
+	# Calcular la diferencia cuadrática entre las coordenadas
+	dist = np.sqrt((XLAT - lat_target)**2 + (XLONG - lon_target)**2)
+
+	# Encontrar el índice del mínimo valor en la matriz de distancias
+	min_index = np.unravel_index(np.argmin(dist), dist.shape)
+
+	return min_index
+
+
+
 # Función para ajustar el entorno del punto a la 15 km relaxation condition (Cavalleri et al., 2024) https://doi.org/10.1016/j.atmosres.2024.107734
 def relaxation15(grid):
-	if grid in [ 'HCLIM_IBERIAxxs_10']:
+	if grid in [ 'HCLIM_IBERIAxxs_10', 'WRF']:
 		c = 9
 	elif grid in [ 'HCLIM_IBERIAxxm_40', 'HCLIM_IBERIAxm_40', 'CERRA','CERRA_LAND', 'COSMO-REA6']:
 		c = 3
@@ -69,29 +81,6 @@ def relaxation15(grid):
 		c = 2
 	return c
 
-# Función para recortar dataframes 
-def sellatlonbox_dataframe(df, latitudes, longitudes):
-	"""
-	Recorta un DataFrame de estaciones de acuerdo a los límites de latitud y longitud
-	obtenidos de un archivo NetCDF.
-
-	:param df: DataFrame con columnas 'latitude' y 'longitude'.
-	:param latitudes: Vector de latitudes (unidimensional) obtenidas de la proyección.
-	:param longitudes: Vector de longitudes (unidimensional) obtenidas de la proyección.
-	:return: DataFrame recortado dentro del dominio geográfico.
-	"""
-	# Definir los límites del dominio
-	lat_min = latitudes.min()
-	lat_max = latitudes.max()
-	lon_min = longitudes.min()
-	lon_max = longitudes.max()
-	# Filtrar las estaciones dentro de los límites de latitud y longitud
-	df_recortado = df[
-		(df['latitude'] >= lat_min) & (df['latitude'] <= lat_max) & 
-		(df['longitude'] >= lon_min) & (df['longitude'] <= lon_max)
-	]
-
-	return df_recortado
 
 # Función para calcular el SEEPS (Stable Equitable Error in Probability Space)
 def compute_SEEPS(observed, forecast, dry_threshold=0.25, wet_threshold=None, p_clim=None):
@@ -125,17 +114,6 @@ def compute_SEEPS(observed, forecast, dry_threshold=0.25, wet_threshold=None, p_
 	p2 = (1 - p1) * 2 / 3
 	p3 = (1 - p1) * 1 / 3
 	
-	'''
-	#p_clim = np.array([p1, p2, p3])
-	def penalty(p_obs, p_fcst, p_clim):
-		return ((p_obs - p_clim) ** 2 + (p_fcst - p_clim) ** 2) / (2 * p_clim * (1 - p_clim))
-	
-	penalty_matrix = np.zeros((3, 3))
-	
-	for i in range(3):
-		for j in range(3):
-			penalty_matrix[i, j] = penalty(obs_probs[i], fcst_probs[j], p_clim[i])
-	'''
 	a11 = 0
 	a12 = 1 / (1 - p1)
 	a13 = 4 / (1 - p1)
@@ -181,7 +159,7 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 	# Cargar datos de estaciones (archivo de ejemplo 'stations_data.csv')
 	print('loading stations CSV data...')
 	try: 
-		stations_data_0 = pd.read_csv('stations_data_' + selected_variable + '.csv')
+		stations_data_0 = pd.read_csv('stations_data_' + selected_variable + '_xxs_delta_CIMASall.csv')
 		stations_data_0['date'] = pd.to_datetime(stations_data_0['date'])
 		
 		# Filtrar por el periodo especificado
@@ -247,8 +225,8 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 			})
 		
 			# Si la estación tiene menos del 90% de completitud, agregarla a la lista de estaciones a eliminar
-			#if completeness_percentage < 90:
-				#stations_to_remove.append(station_id)
+			if completeness_percentage < 90:
+				stations_to_remove.append(station_id)
 		
 		# Convertir resultados a DataFrame
 		results_df= pd.DataFrame(results)
@@ -309,8 +287,8 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 		stations_data_0 = stations_data_0[~stations_data_0[selected_variable].isin(values_to_remove)]
 		
 		# Eliminar las estaciones con menos del 90% de completitud
-		#stations_data_0 = stations_data_0[~stations_data_0['station_id'].isin(stations_to_remove)]
-		#print(f"Se han eliminado las estaciones con menos del 90 por ciento de completitud: {len(stations_to_remove)} estaciones.")
+		stations_data_0 = stations_data_0[~stations_data_0['station_id'].isin(stations_to_remove)]
+		print(f"Se han eliminado las estaciones con menos del 90 por ciento de completitud: {len(stations_to_remove)} estaciones.")
 	
 	except FileNotFoundError:
 		print(f'Error - file not found: stations_data_{selected_variable}.csv')
@@ -323,8 +301,18 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 		print('loading netCDF grid data...')
 		
 		try:
-			 
-			grid_file = 'grid_data_' + grid + '_' + selected_variable + '.nc'
+			if grid not in [ 'HCLIM_IBERIAxxs_10', 'HCLIM_IBERIAxxm_40', 'HCLIM_IBERIAxm_40', 'HCLIM_CIMAS_1', 'WRF']: 
+				grid_file = '/MASIVO/clc/NUEVO_GRID_EVALUATOR/grid_data_' + grid + '_' + selected_variable + '.nc'
+			elif grid in [ 'HCLIM_IBERIAxxs_10']:
+				grid_file = '/MASIVO/clt/Descargas/pr_fp_IBERIAxxs_1.0_h43_aro_ibexxs10_3_ibexxm40_3h_day_2009_2014.nc'
+			elif grid in [ 'HCLIM_IBERIAxxm_40']:
+				grid_file = '/MASIVO/clt/Descargas/pr_fp_IBERIAxxm_4.0_h43_aro_ibexxm40_era5_3h_day_2009_2014.nc'
+			elif grid in [ 'HCLIM_IBERIAxm_40']:
+				grid_file = '/MASIVO/clt/Descargas/pr_fp_IBERIAxm_4.0_h43_aro_ibexm40_era5_3h_day_2009_2014.nc'
+			elif grid in [ 'HCLIM_CIMAS_1']:
+				grid_file = '/MASIVO/clt/Descargas/pr_fp_CIMAS_1_h43_aro_cimas1km_aro_ibexxm40_3h_day_2009_2014.nc'
+			elif grid in [ 'WRF']:
+				grid_file = '/MASIVO/clt/Descargas/WRF_pr_acc_2010_2014.nc'
 			grid_data = nc.Dataset(grid_file)
 
 		except:
@@ -360,22 +348,21 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
     			targetvar = [string for string in names if string in ['t2m']][0]
 		else:
 			targetvar = names[-1]
-		targetlat = [string for string in names if 'lat' in string][0]
-		targetlon = [string for string in names if 'lon' in string][0]
-		targettime = [string for string in names if string in ['time', 'valid_time']][0]
+		targetlat = [string for string in names if 'lat' in string.lower()][0]
+		targetlon = [string for string in names if 'lon' in string.lower()][0]
+		targettime = [string for string in names if string in ['time','XTIME', 'valid_time']][0]
 		
 		# Variables dentro del archivo netCDF y conversión de las unidades
 		
 		if grid not in [ 'HCLIM_IBERIAxxs_10', 'HCLIM_IBERIAxxm_40', 'HCLIM_IBERIAxm_40']: 
 			grid_lat = grid_data.variables[targetlat][:]
 			grid_lon = grid_data.variables[targetlon][:]
+				
 		else: 
 			#HCLIM no está en regular lat/lon por lo que hay que realizar la conversión
 			grid_lat, grid_lon = get_lat_lon(grid_data)
-			#stations_data = sellatlonbox_dataframe(stations_data, grid_lat, grid_lon)
-			#stations_data_0 = sellatlonbox_dataframe(stations_data_0, grid_lat, grid_lon)
-			#print(stations_data)
 		grid_time = grid_data.variables[targettime][:]
+		
 
 		try:
 			if not np.any(grid_time.mask) == True:
@@ -397,11 +384,11 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 			grid_targetvar = grid_data.variables[targetvar][:].astype('float32') # mantiene las unidades de viento
 		elif selected_variable in ['wind_speed'] and grid in ['COSMO-REA6']:
 			grid_targetvar = grid_data.variables[targetvar][:][:,0,:,:].astype('float32') # mantiene las unidades de viento y pasa de 4D a 3D
-		elif selected_variable == 'precipitation' and grid not in ['ISIMIP-CHELSA', 'CHIRPS', 'CERRA', 'HCLIM_IBERIAxxs_10', 'HCLIM_IBERIAxxm_40', 'HCLIM_IBERIAxm_40']:
+		elif selected_variable == 'precipitation' and grid not in ['ISIMIP-CHELSA', 'CHIRPS', 'CERRA', 'HCLIM_IBERIAxxs_10', 'HCLIM_IBERIAxxm_40', 'HCLIM_IBERIAxm_40', 'WRF']:
 			grid_targetvar = grid_data.variables[targetvar][:].astype('float32')*1000 # convierte m/día a mm/día
 		elif selected_variable == 'precipitation' and grid == 'CERRA':
 			grid_targetvar = grid_data.variables[targetvar][:][:,0,:,:].astype('float32')*1000 # convierte m/día a mm/día y pasa de 4D a 3D
-		elif selected_variable == 'precipitation' and grid in ['CHIRPS']:
+		elif selected_variable == 'precipitation' and grid in ['CHIRPS', 'WRF']:
 			grid_targetvar = grid_data.variables[targetvar][:].astype('float32') # mantiene las unidades en mm/día
 		elif selected_variable == 'precipitation' and grid in ['ISIMIP-CHELSA', 'HCLIM_IBERIAxxs_10', 'HCLIM_IBERIAxxm_40', 'HCLIM_IBERIAxm_40']:
 			grid_targetvar = grid_data.variables[targetvar][:].astype('float32')*86400 # convierte kg/m²s a mm/día
@@ -417,13 +404,14 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 			print('Error - units')
 			exit()
 		
-		# forzar sentido ascendente
-		if (grid_lat[0] > grid_lat[-1]):
-			grid_lat = np.flip(grid_lat)
-			grid_targetvar = np.flip(grid_targetvar, axis=1)
-		if (grid_lon[0] > grid_lon[-1]):
-			grid_lon = np.flip(grid_lon)
-			grid_targetvar = np.flip(grid_targetvar, axis=2)
+		if grid != 'WRF':
+			# forzar sentido ascendente
+			if (grid_lat[0] > grid_lat[-1]):
+				grid_lat = np.flip(grid_lat)
+				grid_targetvar = np.flip(grid_targetvar, axis=1)
+			if (grid_lon[0] > grid_lon[-1]):
+				grid_lon = np.flip(grid_lon)
+				grid_targetvar = np.flip(grid_targetvar, axis=2)
 		# tratamiento de máscaras, nans y valores de relleno
 		grid_targetvar = np.where(grid_targetvar.mask, np.nan, grid_targetvar) # valores enmascarados se sustituyen por NaN
 		fill_value = getattr(grid_data.variables[targetvar], '_FillValue', None)  # Detectar si existe _FillValue
@@ -440,6 +428,8 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 			# Verificar si alguna diferencia es mayor a 24 horas, en unidades compatibles
 			if units.startswith('days'):
 				threshold = 1  # 1 día
+			elif units.startswith('minutes'):
+				threshold = 60 * 24  # 24 horas
 			elif units.startswith('hours'):
 				threshold = 24  # 24 horas
 			elif units.startswith('seconds'):
@@ -460,24 +450,37 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 
 		# Crear el interpolador para los datos de la rejilla 
 		def create_interpolator(targetvar_data, lat_array, lon_array, lat_station, lon_station, time_idx, interpolation_method, date):
-			lat_array = np.sort(np.unique(lat_array))
-			lon_array = np.sort(np.unique(lon_array))		
-			lat_idx = np.abs(lat_array - lat_station).argmin()
-			lon_idx = np.abs(lon_array - lon_station).argmin()
-
-			# Definir rangos para interpolación local
-			#lat_range = lat_array[max(0, lat_idx-1):min(len(lat_array), lat_idx+2)]
-			#lon_range = lon_array[max(0, lon_idx-1):min(len(lon_array), lon_idx+2)]	
-			#targetvar_range = targetvar_data[time_idx, max(0, lat_idx-1):min(len(lat_array), lat_idx+2), max(0, lon_idx-1):min(len(lon_array), lon_idx+2)]
-			if interpolation_method == '15km relaxation':
-				lat_range = lat_array[max(0, lat_idx-(relaxation15(grid)-1)):min(len(lat_array), lat_idx+relaxation15(grid))]
-				lon_range = lon_array[max(0, lon_idx-(relaxation15(grid)-1)):min(len(lon_array), lon_idx+relaxation15(grid))]
-				targetvar_range = targetvar_data[time_idx, max(0, lat_idx-(relaxation15(grid)-1)):min(len(lat_array), lat_idx+relaxation15(grid)), max(0, lon_idx-(relaxation15(grid)-1)):min(len(lon_array), lon_idx+relaxation15(grid))]
-			else:
-				lat_range = lat_array[max(0, lat_idx-1):min(len(lat_array), lat_idx+2)]
-				lon_range = lon_array[max(0, lon_idx-1):min(len(lon_array), lon_idx+2)]	
-				targetvar_range = targetvar_data[time_idx, max(0, lat_idx-1):min(len(lat_array), lat_idx+2), max(0, lon_idx-1):min(len(lon_array), lon_idx+2)]
+			
+			if grid != 'WRF':
+				lat_array = np.sort(np.unique(lat_array))
+				lon_array = np.sort(np.unique(lon_array))
+				lat_idx = np.abs(lat_array - lat_station).argmin()
+				lon_idx = np.abs(lon_array - lon_station).argmin()
 				
+				# Definir rangos para interpolación local
+				if interpolation_method == '15km relaxation':
+					lat_range = lat_array[max(0, lat_idx-(relaxation15(grid)-1)):min(len(lat_array), lat_idx+relaxation15(grid))]
+					lon_range = lon_array[max(0, lon_idx-(relaxation15(grid)-1)):min(len(lon_array), lon_idx+relaxation15(grid))]
+					targetvar_range = targetvar_data[time_idx, max(0, lat_idx-(relaxation15(grid)-1)):min(len(lat_array), lat_idx+relaxation15(grid)), max(0, lon_idx-(relaxation15(grid)-1)):min(len(lon_array), lon_idx+relaxation15(grid))]
+				else:
+					lat_range = lat_array[max(0, lat_idx-1):min(len(lat_array), lat_idx+2)]
+					lon_range = lon_array[max(0, lon_idx-1):min(len(lon_array), lon_idx+2)]	
+					targetvar_range = targetvar_data[time_idx, max(0, lat_idx-1):min(len(lat_array), lat_idx+2), max(0, lon_idx-1):min(len(lon_array), lon_idx+2)]
+			else:
+				idx_wrf = find_nearest_idx_wrf(lat_station, lon_station, lat_array, lon_array)
+				lat_idx = idx_wrf[0]
+				lon_idx = idx_wrf[1]
+				
+				# Definir rangos para interpolación local
+				if interpolation_method == '15km relaxation':
+					lat_range = lat_array[max(0, lat_idx-(relaxation15(grid)-1)):min(len(lat_array[:,0]), lat_idx+relaxation15(grid)), lon_idx]  
+					lon_range = lon_array[lat_idx, max(0, lon_idx-(relaxation15(grid)-1)):min(len(lon_array[0,:]), lon_idx+relaxation15(grid))]
+					targetvar_range = targetvar_data[time_idx, max(0, lat_idx-(relaxation15(grid)-1)):min(len(lat_array[:,0]), lat_idx+relaxation15(grid)), max(0, lon_idx-(relaxation15(grid)-1)):min(len(lon_array[0,:]), lon_idx+relaxation15(grid))]
+				else:
+					lat_range = lat_array[max(0, lat_idx-1):min(len(lat_array[:,0]), lat_idx+2), lon_idx]  
+					lon_range = lon_array[lat_idx, max(0, lon_idx-1):min(len(lon_array[0,:]), lon_idx+2)]
+					targetvar_range = targetvar_data[time_idx, max(0, lat_idx-1):min(len(lat_array[:,0]), lat_idx+2), max(0, lon_idx-1):min(len(lon_array[0,:]), lon_idx+2)]
+					
 			# Comprobar y manejar `np.nan` en targetvar_range. Si todos son `np.nan`, devuelve `np.nan`
 			if np.isnan(targetvar_range).all():
 				targetvar_range[:] = np.nan  # Por ejemplo, rellena todo con ceros
@@ -494,17 +497,14 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 				
 				# Rellenar NaN con el valor más cercano válido
 				targetvar_range[~valid_mask] = targetvar_range[tuple(closest_valid_idx)]
-			
+
 			if interpolation_method == '15km relaxation' and grid not in ['ERA5', 'EOBS_LR', 'CLARA-A3']:
-				#print('hola')
 				stations_data_filter = stations_data[(stations_data['latitude'] == lat_station) & (stations_data['longitude'] == lon_station) & (stations_data['date'] == date)]
-				#print(stations_data_filter)
 				stations_data_value = stations_data_filter[selected_variable].iloc[0]
-				#print(stations_data_value)
+				#s Selecciona el valor que más se aproxima al de la estación
 				closest_idx_value = np.unravel_index(np.abs(targetvar_range - stations_data_value).argmin(), targetvar_range.shape)
 				closest_value = targetvar_range[closest_idx_value]
-				#print(closest_value)
-				#exit()
+
 				return closest_value
 			elif interpolation_method == '15km relaxation' and grid in ['ERA5', 'EOBS_LR','CLARA-A3']:
 				return RegularGridInterpolator(
@@ -522,7 +522,7 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 					bounds_error=True,
 					fill_value=np.nan
 				)
-			
+				
 		# Función para extraer valores interpolados de la rejilla para las ubicaciones y fechas de las estaciones 
 		def extract_interpolated_grid_value(lat, lon, date):
 			time_idx = convert_time_to_index(grid_time, date)
@@ -532,7 +532,6 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 					interpolated_value  = create_interpolator(grid_targetvar, grid_lat, grid_lon, lat, lon, time_idx,interpolation_method, date)
 					if selected_variable == 'precipitation' and interpolated_value < 0:
 						interpolated_value = 0
-					print(interpolated_value)
 					return interpolated_value
 				else:
 					interpolator = create_interpolator(grid_targetvar, grid_lat, grid_lon, lat, lon, time_idx,interpolation_method, date)
@@ -663,17 +662,66 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 					'Correlation': np.nan,
 					'Variance Bias': np.nan
 				})
-			mean_bias = data['difference_interpolated'].mean()
-			mean_relative_bias = 100 * (data['difference_interpolated'].mean() / stations_data[selected_variable].mean())
+			mean_bias = data['difference_interpolated'].mean() # data['interpolated_grid_value'].mean() - stations_data[selected_variable].mean()
+			if stations_data[selected_variable].mean() < 0.001 and data['interpolated_grid_value'].mean() > 0.001:
+				mean_relative_bias = np.nan
+			elif data[selected_variable].mean() < 0.001 and data['interpolated_grid_value'].mean() < 0.001:
+				mean_relative_bias = 0
+			else:
+				mean_relative_bias = 100 * (data['interpolated_grid_value'].mean() - stations_data[selected_variable].mean())/ stations_data[selected_variable].mean()
+				
 			multiplicative_bias = (data['interpolated_grid_value'].mean() / stations_data[selected_variable].mean())
 			mean_absolute_error = data['difference_interpolated'].abs().mean()
 			correlation, _ = spearmanr(data['interpolated_grid_value'], data[selected_variable])
 			variance_bias = data['interpolated_grid_value'].var() - data[selected_variable].var()
 			std_bias = data['interpolated_grid_value'].std() - data[selected_variable].std()
-			percentile90_bias = np.percentile(data['interpolated_grid_value'], 90) - np.percentile(data[selected_variable], 90)
+			
+			if data[selected_variable].var() < 0.001 and data['interpolated_grid_value'].var() > 0.001:
+				var_relative_bias = np.nan
+			elif data[selected_variable].var() < 0.001 and data['interpolated_grid_value'].var() < 0.001:
+				var_relative_bias = 0
+			else:
+				var_relative_bias = 100 * (data['interpolated_grid_value'].var() - data[selected_variable].var()) / data[selected_variable].var()
+				
+			if data[selected_variable].std() < 0.001 and data['interpolated_grid_value'].std() > 0.001:
+				std_relative_bias = np.nan
+			elif data[selected_variable].std() < 0.001 and data['interpolated_grid_value'].std() < 0.001:
+				std_relative_bias = 0
+			else:
+				std_relative_bias = 100 * (data['interpolated_grid_value'].std() - data[selected_variable].std()) / data[selected_variable].std()
+			 
 			percentile10_bias = np.percentile(data['interpolated_grid_value'], 10) - np.percentile(data[selected_variable], 10)
+			percentile90_bias = np.percentile(data['interpolated_grid_value'], 90) - np.percentile(data[selected_variable], 90)
 			percentile95_bias = np.percentile(data['interpolated_grid_value'], 95) - np.percentile(data[selected_variable], 95)
 			percentile99_bias = np.percentile(data['interpolated_grid_value'], 99) - np.percentile(data[selected_variable], 99)
+			
+			if np.percentile(data[selected_variable], 99) < 0.001 and np.percentile(data['interpolated_grid_value'], 99) > 0.001:
+				percentile99_relative_bias = np.nan
+			elif np.percentile(data[selected_variable], 99) < 0.001 and np.percentile(data['interpolated_grid_value'], 99) < 0.001:
+				percentile99_relative_bias = 0
+			else:
+				percentile99_relative_bias = 100 * (np.percentile(data['interpolated_grid_value'], 99) - np.percentile(data[selected_variable], 99)) / np.percentile(data[selected_variable], 99)
+			
+			if np.percentile(data[selected_variable], 95) < 0.001 and np.percentile(data['interpolated_grid_value'], 95) > 0.001:
+				percentile95_relative_bias = np.nan
+			elif np.percentile(data[selected_variable], 95) < 0.001 and np.percentile(data['interpolated_grid_value'], 95) < 0.001:
+				percentile95_relative_bias = 0
+			else:
+				percentile95_relative_bias = 100 * (np.percentile(data['interpolated_grid_value'], 95) - np.percentile(data[selected_variable], 95)) / np.percentile(data[selected_variable], 95)
+			
+			if np.percentile(data[selected_variable], 90) < 0.001 and np.percentile(data['interpolated_grid_value'], 90) > 0.001:
+				percentile90_relative_bias = np.nan
+			elif np.percentile(data[selected_variable], 90) < 0.001 and np.percentile(data['interpolated_grid_value'], 90) < 0.001:
+				percentile90_relative_bias = 0
+			else:
+				percentile90_relative_bias = 100 * (np.percentile(data['interpolated_grid_value'], 90) - np.percentile(data[selected_variable], 90)) / np.percentile(data[selected_variable], 90)
+			
+			if np.percentile(data[selected_variable], 10) < 0.001 and np.percentile(data['interpolated_grid_value'], 10) > 0.001:
+				percentile10_relative_bias = np.nan
+			elif np.percentile(data[selected_variable], 10) < 0.001 and np.percentile(data['interpolated_grid_value'], 10) < 0.001:
+				percentile10_relative_bias = 0
+			else:
+				percentile10_relative_bias = 100 * (np.percentile(data['interpolated_grid_value'], 10) - np.percentile(data[selected_variable], 10)) / np.percentile(data[selected_variable], 10)
 			
 			# Filtrar solo los días con lluvia
 			data_rain = data[data[selected_variable] > 0.25]
@@ -683,30 +731,51 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 				n = len(sorted_precip)
 				index_threshold = n * 2 // 3
 				return sorted_precip.iloc[index_threshold]
-
+			
 			# Calcular el umbral de precipitación para dividir en relación 2:1
-			sorted_precip = data_rain[selected_variable].sort_values()
-			n = len(sorted_precip)
-			index_threshold = n * 2 // 3
-			wet_threshold = sorted_precip.iloc[index_threshold]
+			sorted_precip = data_rain[selected_variable].dropna().sort_values()  # Elimina NaN antes de ordenar
+
+			n = len(sorted_precip)  # Número de valores disponibles después de eliminar NaN
+
+			if n == 0:
+				#print(f"Advertencia: sorted_precip está vacío para la variable {selected_variable}. Se asignará un valor predeterminado.")
+				wet_threshold = np.nan  # O puedes usar un valor predeterminado como 0
+			elif n == 1:
+				#print(f"Advertencia: solo hay un valor en sorted_precip. No se puede calcular un umbral significativo.")
+				wet_threshold = sorted_precip.iloc[0]  # Único valor disponible
+			else:
+				index_threshold = min(n * 2 // 3, n - 1)  # Asegura que el índice esté dentro de los límites
+				wet_threshold = sorted_precip.iloc[index_threshold]
 
 			# Calcular SEEPS usando el umbral calculado
-			seeps_skill_score = 1 - compute_SEEPS(data[selected_variable].values, data["interpolated_grid_value"].values, wet_threshold=wet_threshold)
-
+			if np.isnan(wet_threshold):  # Manejo seguro si el umbral no es válido
+				seeps_skill_score = np.nan  # O cualquier otra estrategia adecuada
+			else:
+				seeps_skill_score = 1 - compute_SEEPS(
+					data[selected_variable].values, 
+					data["interpolated_grid_value"].values, 
+					wet_threshold=wet_threshold
+				)
 			
 			return pd.Series({
 				'Mean Bias': mean_bias,
-				'P99 Bias': percentile99_bias,
-				'P95 Bias': percentile95_bias,
-				'P90 Bias': percentile90_bias,
-				'P10 Bias': percentile10_bias,
-				'Mean Absolute Error': mean_absolute_error,
-				'Correlation': correlation,
-				'Variance Bias': variance_bias,
-				'SEEPS Skill Score': seeps_skill_score,
 				'Mean relative Bias': mean_relative_bias,
+				'Mean Absolute Error': mean_absolute_error,
 				'Multiplicative Bias': multiplicative_bias,
-				'Std Bias': std_bias
+				'P99 Bias': percentile99_bias,
+				'P99 relative Bias': percentile99_relative_bias,
+				'P95 Bias': percentile95_bias,
+				'P95 relative Bias': percentile95_relative_bias,
+				'P90 Bias': percentile90_bias,
+				'P90 relative Bias': percentile90_relative_bias,
+				'P10 Bias': percentile10_bias,
+				'P10 relative Bias': percentile10_relative_bias,
+				'Correlation': correlation,
+				'SEEPS Skill Score': seeps_skill_score,
+				'Variance Bias': variance_bias,
+				'Variance relative Bias': var_relative_bias,
+				'Std Bias': std_bias,
+				'Std relative Bias': std_relative_bias
 			})
 			
 		def calculate_metrics_interpolated_humidity(data):
@@ -773,7 +842,7 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 			}
 		
 		elif selected_variable == 'radiation':
-			metrics_per_station_interpolated = stations_data.groupby('station_id').apply(calculate_metrics_interpolated_radiation).reset_index()
+			metrics_per_station_interpolated = stations_data.groupby('station_id').apply(calculate_metrics_interpolated_wspeed).reset_index()
 			# Guardar métricas para cada estación en un csv
 			metrics_per_station_interpolated.to_csv('metrics_per_station_interpolated_' + grid + '_' + selected_variable + '.csv', index=False)
 			print('metrics_per_station_interpolated_' + grid + '_' + selected_variable + '.csv has been saved')	
@@ -791,6 +860,7 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 		
 		elif selected_variable == 'precipitation':
 			metrics_per_station_interpolated = stations_data.groupby('station_id').apply(calculate_metrics_interpolated_precip).reset_index()
+			
 			# Guardar métricas para cada estación en un csv
 				
 			units = {
@@ -805,6 +875,12 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 				'Number of wet days Bias': 'days',
 				'SEEPS Skill Score': 'Dimensionless',
 				'Mean relative Bias': '%',
+				'Std relative Bias': '%',
+				'Variance relative Bias': '%',
+				'P99 relative Bias': '%',
+				'P95 relative Bias': '%',
+				'P90 relative Bias': '%',
+				'P10 relative Bias': '%',
 				'Multiplicative Bias': 'Dimensionless',
 				'Std Bias': 'mm'
 			}
@@ -837,8 +913,9 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 
 			metrics_per_station_interpolated.to_csv('metrics_per_station_interpolated_' + grid + '_' + selected_variable + '.csv', index=False)
 			print('metrics_per_station_interpolated_' + grid + '_' + selected_variable + '.csv has been saved')
-
+			
 		elif selected_variable == 'humidity':
+			print(stations_data.groupby('station_id').apply(calculate_metrics_interpolated_humidity))
 			metrics_per_station_interpolated = stations_data.groupby('station_id').apply(calculate_metrics_interpolated_humidity).reset_index()
                         # Guardar métricas para cada estación en un csv
 			metrics_per_station_interpolated.to_csv('metrics_per_station_interpolated_' + grid + '_' + selected_variable + '.csv', index=False)
@@ -1080,7 +1157,7 @@ def on_generate_button_click():
 	
 # Variables y lista de rejillas
 variables = ['temperature', 'maximum_temperature', 'minimum_temperature', 'precipitation', 'wind_speed', 'humidity']
-grids = ['HCLIM_IBERIAxm_40', 'HCLIM_IBERIAxxm_40', 'HCLIM_IBERIAxxs_10', 'ISIMIP-CHELSA', 'CHIRTS', 'CHIRPS', 'ERA5', 'ERA5-Land', 'COSMO-REA6', 'CERRA', 'CERRA_LAND', 'EOBS', 'EOBS_HR', 'EOBS_LR', 'CLARA-A3']
+grids = ['HCLIM_IBERIAxm_40', 'HCLIM_IBERIAxxm_40', 'HCLIM_IBERIAxxs_10', 'WRF', 'ISIMIP-CHELSA', 'CHIRTS', 'CHIRPS', 'ERA5', 'ERA5-Land', 'COSMO-REA6', 'CERRA', 'CERRA_LAND', 'EOBS', 'EOBS_HR', 'EOBS_LR', 'CLARA-A3']
 months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 
 
