@@ -159,7 +159,7 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 	# Cargar datos de estaciones (archivo de ejemplo 'stations_data.csv')
 	print('loading stations CSV data...')
 	try: 
-		stations_data_0 = pd.read_csv('stations_data_' + selected_variable + '_xxs_delta_CIMASall.csv')
+		stations_data_0 = pd.read_csv('stations_data_' + selected_variable + '.csv')
 		stations_data_0['date'] = pd.to_datetime(stations_data_0['date'])
 		
 		# Filtrar por el periodo especificado
@@ -301,18 +301,7 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 		print('loading netCDF grid data...')
 		
 		try:
-			if grid not in [ 'HCLIM_IBERIAxxs_10', 'HCLIM_IBERIAxxm_40', 'HCLIM_IBERIAxm_40', 'HCLIM_CIMAS_1', 'WRF']: 
-				grid_file = '/MASIVO/clc/NUEVO_GRID_EVALUATOR/grid_data_' + grid + '_' + selected_variable + '.nc'
-			elif grid in [ 'HCLIM_IBERIAxxs_10']:
-				grid_file = '/MASIVO/clt/Descargas/pr_fp_IBERIAxxs_1.0_h43_aro_ibexxs10_3_ibexxm40_3h_day_2009_2014.nc'
-			elif grid in [ 'HCLIM_IBERIAxxm_40']:
-				grid_file = '/MASIVO/clt/Descargas/pr_fp_IBERIAxxm_4.0_h43_aro_ibexxm40_era5_3h_day_2009_2014.nc'
-			elif grid in [ 'HCLIM_IBERIAxm_40']:
-				grid_file = '/MASIVO/clt/Descargas/pr_fp_IBERIAxm_4.0_h43_aro_ibexm40_era5_3h_day_2009_2014.nc'
-			elif grid in [ 'HCLIM_CIMAS_1']:
-				grid_file = '/MASIVO/clt/Descargas/pr_fp_CIMAS_1_h43_aro_cimas1km_aro_ibexxm40_3h_day_2009_2014.nc'
-			elif grid in [ 'WRF']:
-				grid_file = '/MASIVO/clt/Descargas/WRF_pr_acc_2010_2014.nc'
+			grid_file = 'grid_data_' + grid + '_' + selected_variable + '.nc'
 			grid_data = nc.Dataset(grid_file)
 
 		except:
