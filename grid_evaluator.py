@@ -7,7 +7,7 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 from scipy.interpolate import RegularGridInterpolator
-from scipy.stats import pearsonr, spearmanr
+from scipy.stats import pearsonr, spearmanr, wasserstein_distance
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 from pyproj import Proj, Transformer
@@ -571,6 +571,7 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 			variance_bias = data['interpolated_grid_value'].var() - data[selected_variable].var()
 			percentile90_bias = np.percentile(data['interpolated_grid_value'], 90) - np.percentile(data[selected_variable], 90)
 			percentile10_bias = np.percentile(data['interpolated_grid_value'], 10) - np.percentile(data[selected_variable], 10)
+			wd = wasserstein_distance(data['interpolated_grid_value'], data[selected_variable])
 			
 			return pd.Series({
 				'Mean Bias': mean_bias,
@@ -579,7 +580,8 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 				'Mean Absolute Error': mean_absolute_error,
 				'RMSE': rmse,
 				'Correlation': correlation,
-				'Variance Bias': variance_bias
+				'Variance Bias': variance_bias,
+				'Wasserstein Distance': wd
 			})
 
 		def calculate_metrics_interpolated_wspeed(data):
@@ -600,6 +602,7 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 			percentile90_bias = np.percentile(data['interpolated_grid_value'], 90) - np.percentile(data[selected_variable], 90)
 			percentile10_bias = np.percentile(data['interpolated_grid_value'], 10) - np.percentile(data[selected_variable], 10)
 			percentile95_bias = np.percentile(data['interpolated_grid_value'], 95) - np.percentile(data[selected_variable], 95)
+			wd = wasserstein_distance(data['interpolated_grid_value'], data[selected_variable])
 			
 			return pd.Series({
 				'Mean Bias': mean_bias,
@@ -609,7 +612,8 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 				'Mean Absolute Error': mean_absolute_error,
 				'RMSE': rmse,
 				'Correlation': correlation,
-				'Variance Bias': variance_bias
+				'Variance Bias': variance_bias,
+				'Wasserstein Distance': wd
 			})
 		
 		def calculate_metrics_interpolated_radiation(data):
@@ -630,6 +634,7 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 			percentile90_bias = np.percentile(data['interpolated_grid_value'], 90) - np.percentile(data[selected_variable], 90)
 			percentile10_bias = np.percentile(data['interpolated_grid_value'], 10) - np.percentile(data[selected_variable], 10)
 			percentile95_bias = np.percentile(data['interpolated_grid_value'], 95) - np.percentile(data[selected_variable], 95)
+			wd = wasserstein_distance(data['interpolated_grid_value'], data[selected_variable])
 			
 			return pd.Series({
 				'Mean Bias': mean_bias,
@@ -639,7 +644,8 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 				'Mean Absolute Error': mean_absolute_error,
 				'RMSE': rmse,
 				'Correlation': correlation,
-				'Variance Bias': variance_bias
+				'Variance Bias': variance_bias,
+				'Wasserstein Distance': wd
 			})
 		
 		def calculate_metrics_interpolated_precip(data):
@@ -683,6 +689,7 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 			percentile90_bias = np.percentile(data['interpolated_grid_value'], 90) - np.percentile(data[selected_variable], 90)
 			percentile95_bias = np.percentile(data['interpolated_grid_value'], 95) - np.percentile(data[selected_variable], 95)
 			percentile99_bias = np.percentile(data['interpolated_grid_value'], 99) - np.percentile(data[selected_variable], 99)
+			wd = wasserstein_distance(data['interpolated_grid_value'], data[selected_variable])
 			
 			if np.percentile(data[selected_variable], 99) < 0.001 and np.percentile(data['interpolated_grid_value'], 99) > 0.001:
 				percentile99_relative_bias = np.nan
@@ -764,7 +771,8 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 				'Variance Bias': variance_bias,
 				'Variance relative Bias': var_relative_bias,
 				'Std Bias': std_bias,
-				'Std relative Bias': std_relative_bias
+				'Std relative Bias': std_relative_bias,
+				'Wasserstein Distance': wd
 			})
 			
 		def calculate_metrics_interpolated_humidity(data):
@@ -785,6 +793,7 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 			percentile90_bias = np.percentile(data['interpolated_grid_value'], 90) - np.percentile(data[selected_variable], 90)
 			percentile10_bias = np.percentile(data['interpolated_grid_value'], 10) - np.percentile(data[selected_variable], 10)
 			percentile95_bias = np.percentile(data['interpolated_grid_value'], 95) - np.percentile(data[selected_variable], 95)
+			wd = wasserstein_distance(data['interpolated_grid_value'], data[selected_variable])
 			
 			return pd.Series({
 				'Mean Bias': mean_bias,
@@ -794,7 +803,8 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 				'Mean Absolute Error': mean_absolute_error,
 				'RMSE': rmse,
 				'Correlation': correlation,
-				'Variance Bias': variance_bias
+				'Variance Bias': variance_bias,
+				'Wasserstein Distance': wd
 			})
 		
 		# Calcular métricas basadas en la variable seleccionada
@@ -811,7 +821,8 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 				'Mean Absolute Error': '°C',
 				'RMSE': '°C',
 				'Correlation': 'Dimensionless',
-				'Variance Bias': '°C²'
+				'Variance Bias': '°C²',
+				'Wasserstein Distance': 'Dimensionless'
 			}
 
 		elif selected_variable == 'wind_speed':
@@ -827,7 +838,8 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 				'Mean Absolute Error': 'm/s',
 				'RMSE': 'm/s',
 				'Correlation': 'Dimensionless',
-				'Variance Bias': 'm²/s²'
+				'Variance Bias': 'm²/s²',
+				'Wasserstein Distance': 'Dimensionless'
 			}
 		
 		elif selected_variable == 'radiation':
@@ -843,7 +855,8 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 				'Mean Absolute Error': 'J/m²',
 				'RMSE': 'J/m²',
 				'Correlation': 'Dimensionless',
-				'Variance Bias': 'J²/m⁴'
+				'Variance Bias': 'J²/m⁴',
+				'Wasserstein Distance': 'Dimensionless'
 			}
 		
 		
@@ -871,7 +884,8 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 				'P90 relative Bias': '%',
 				'P10 relative Bias': '%',
 				'Multiplicative Bias': 'Dimensionless',
-				'Std Bias': 'mm'
+				'Std Bias': 'mm',
+				'Wasserstein Distance': 'Dimensionless'
 			}
 			
 			# Calcular el número de días con precipitación observada mayor a 0.25 mm
@@ -917,7 +931,8 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 				'Mean Absolute Error': '%',
 				'RMSE': '%',
 				'Correlation': 'Dimensionless',
-				'Variance Bias': '%²'
+				'Variance Bias': '%²',
+				'Wasserstein Distance': 'Dimensionless'
 			}
 			
 		else:
@@ -1235,4 +1250,4 @@ generate_button = ttk.Button(root, text='Generate Metrics & Plots', command=on_g
 generate_button.pack(pady=20)
 
 # Iniciar la interfaz gráfica
-root.mainloop() 
+root.mainloop()  
