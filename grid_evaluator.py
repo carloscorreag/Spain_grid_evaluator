@@ -7,7 +7,7 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 from scipy.interpolate import RegularGridInterpolator
-from scipy.stats import pearsonr, spearmanr, wasserstein_distance
+from scipy.stats import pearsonr, spearmanr, skew, kurtosis, ks_2samp, cramervonmises_2samp, wasserstein_distance
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 from pyproj import Proj, Transformer
@@ -365,10 +365,12 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 			else:
 				print('Error - units not found in netCDF metadata')
 		
-		if selected_variable in ['temperature', 'maximum_temperature', 'minimum_temperature'] and grid not in ['CHIRTS', 'ERA5']:
+		if selected_variable in ['temperature', 'maximum_temperature', 'minimum_temperature'] and grid not in ['CHIRTS', 'ERA5', 'COSMO-REA6']:
 			grid_targetvar = grid_data.variables[targetvar][:].astype('float32') - 273.15 # convierte grados Kelvin a grados Celsius
 		elif selected_variable in ['temperature', 'maximum_temperature', 'minimum_temperature'] and grid in ['CHIRTS', 'ERA5']:
 			grid_targetvar = grid_data.variables[targetvar][:].astype('float32') # mantiene las unidades en grados Celsius
+		elif selected_variable in ['temperature', 'maximum_temperature', 'minimum_temperature'] and grid in ['COSMO-REA6']:
+			grid_targetvar = grid_data.variables[targetvar][:][:,0,:,:].astype('float32') # mantiene las unidades en grados Celsius
 		elif selected_variable in ['wind_speed'] and grid not in ['COSMO-REA6']:
 			grid_targetvar = grid_data.variables[targetvar][:].astype('float32') # mantiene las unidades de viento
 		elif selected_variable in ['wind_speed'] and grid in ['COSMO-REA6']:
@@ -571,7 +573,12 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 			variance_bias = data['interpolated_grid_value'].var() - data[selected_variable].var()
 			percentile90_bias = np.percentile(data['interpolated_grid_value'], 90) - np.percentile(data[selected_variable], 90)
 			percentile10_bias = np.percentile(data['interpolated_grid_value'], 10) - np.percentile(data[selected_variable], 10)
+			std_bias = data['interpolated_grid_value'].std() - data[selected_variable].std()
 			wd = wasserstein_distance(data['interpolated_grid_value'], data[selected_variable])
+			ks_stat, ks_p = ks_2samp(data['interpolated_grid_value'], data[selected_variable])
+			cvm = cramervonmises_2samp(data['interpolated_grid_value'], data[selected_variable])
+			skew_bias = skew(data['interpolated_grid_value']) - skew(data[selected_variable])
+			kurtosis_bias = kurtosis(data['interpolated_grid_value']) - kurtosis(data[selected_variable])
 			
 			return pd.Series({
 				'Mean Bias': mean_bias,
@@ -581,7 +588,13 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 				'RMSE': rmse,
 				'Correlation': correlation,
 				'Variance Bias': variance_bias,
-				'Wasserstein Distance': wd
+				'Std Bias': std_bias,
+				'Wasserstein Distance': wd,
+				'KS test stat': ks_stat,
+				'KS test p': ks_p,
+				'Cramer–von Mises': cvm,
+				'Skew Bias': skew_bias,
+				'Kurtosis Bias': kurtosis_bias
 			})
 
 		def calculate_metrics_interpolated_wspeed(data):
@@ -602,7 +615,12 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 			percentile90_bias = np.percentile(data['interpolated_grid_value'], 90) - np.percentile(data[selected_variable], 90)
 			percentile10_bias = np.percentile(data['interpolated_grid_value'], 10) - np.percentile(data[selected_variable], 10)
 			percentile95_bias = np.percentile(data['interpolated_grid_value'], 95) - np.percentile(data[selected_variable], 95)
+			std_bias = data['interpolated_grid_value'].std() - data[selected_variable].std()
 			wd = wasserstein_distance(data['interpolated_grid_value'], data[selected_variable])
+			ks_stat, ks_p = ks_2samp(data['interpolated_grid_value'], data[selected_variable])
+			cvm = cramervonmises_2samp(data['interpolated_grid_value'], data[selected_variable])
+			skew_bias = skew(data['interpolated_grid_value']) - skew(data[selected_variable])
+			kurtosis_bias = kurtosis(data['interpolated_grid_value']) - kurtosis(data[selected_variable])
 			
 			return pd.Series({
 				'Mean Bias': mean_bias,
@@ -613,7 +631,13 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 				'RMSE': rmse,
 				'Correlation': correlation,
 				'Variance Bias': variance_bias,
-				'Wasserstein Distance': wd
+				'Std Bias': std_bias,
+				'Wasserstein Distance': wd,
+				'KS test stat': ks_stat,
+				'KS test p': ks_p,
+				'Cramer–von Mises': cvm,
+				'Skew Bias': skew_bias,
+				'Kurtosis Bias': kurtosis_bias
 			})
 		
 		def calculate_metrics_interpolated_radiation(data):
@@ -634,7 +658,13 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 			percentile90_bias = np.percentile(data['interpolated_grid_value'], 90) - np.percentile(data[selected_variable], 90)
 			percentile10_bias = np.percentile(data['interpolated_grid_value'], 10) - np.percentile(data[selected_variable], 10)
 			percentile95_bias = np.percentile(data['interpolated_grid_value'], 95) - np.percentile(data[selected_variable], 95)
+			std_bias = data['interpolated_grid_value'].std() - data[selected_variable].std()
 			wd = wasserstein_distance(data['interpolated_grid_value'], data[selected_variable])
+			ks_stat, ks_p = ks_2samp(data['interpolated_grid_value'], data[selected_variable])
+			cvm = cramervonmises_2samp(data['interpolated_grid_value'], data[selected_variable])
+			skew_bias = skew(data['interpolated_grid_value']) - skew(data[selected_variable])
+			kurtosis_bias = kurtosis(data['interpolated_grid_value']) - kurtosis(data[selected_variable])
+
 			
 			return pd.Series({
 				'Mean Bias': mean_bias,
@@ -645,7 +675,13 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 				'RMSE': rmse,
 				'Correlation': correlation,
 				'Variance Bias': variance_bias,
-				'Wasserstein Distance': wd
+				'Std Bias': std_bias,
+				'Wasserstein Distance': wd,
+				'KS test stat': ks_stat,
+				'KS test p': ks_p,
+				'Cramer–von Mises': cvm,
+				'Skew Bias': skew_bias,
+				'Kurtosis Bias': kurtosis_bias
 			})
 		
 		def calculate_metrics_interpolated_precip(data):
@@ -689,7 +725,6 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 			percentile90_bias = np.percentile(data['interpolated_grid_value'], 90) - np.percentile(data[selected_variable], 90)
 			percentile95_bias = np.percentile(data['interpolated_grid_value'], 95) - np.percentile(data[selected_variable], 95)
 			percentile99_bias = np.percentile(data['interpolated_grid_value'], 99) - np.percentile(data[selected_variable], 99)
-			wd = wasserstein_distance(data['interpolated_grid_value'], data[selected_variable])
 			
 			if np.percentile(data[selected_variable], 99) < 0.001 and np.percentile(data['interpolated_grid_value'], 99) > 0.001:
 				percentile99_relative_bias = np.nan
@@ -718,6 +753,12 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 				percentile10_relative_bias = 0
 			else:
 				percentile10_relative_bias = 100 * (np.percentile(data['interpolated_grid_value'], 10) - np.percentile(data[selected_variable], 10)) / np.percentile(data[selected_variable], 10)
+			
+			wd = wasserstein_distance(data['interpolated_grid_value'], data[selected_variable])
+			ks_stat, ks_p = ks_2samp(data['interpolated_grid_value'], data[selected_variable])
+			cvm = cramervonmises_2samp(data['interpolated_grid_value'], data[selected_variable])
+			skew_bias = skew(data['interpolated_grid_value']) - skew(data[selected_variable])
+			kurtosis_bias = kurtosis(data['interpolated_grid_value']) - kurtosis(data[selected_variable])
 			
 			# Filtrar solo los días con lluvia
 			data_rain = data[data[selected_variable] > 0.25]
@@ -772,7 +813,12 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 				'Variance relative Bias': var_relative_bias,
 				'Std Bias': std_bias,
 				'Std relative Bias': std_relative_bias,
-				'Wasserstein Distance': wd
+				'Wasserstein Distance': wd,
+				'KS test stat': ks_stat,
+				'KS test p': ks_p,
+				'Cramer–von Mises': cvm,
+				'Skew Bias': skew_bias,
+				'Kurtosis Bias': kurtosis_bias
 			})
 			
 		def calculate_metrics_interpolated_humidity(data):
@@ -793,7 +839,12 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 			percentile90_bias = np.percentile(data['interpolated_grid_value'], 90) - np.percentile(data[selected_variable], 90)
 			percentile10_bias = np.percentile(data['interpolated_grid_value'], 10) - np.percentile(data[selected_variable], 10)
 			percentile95_bias = np.percentile(data['interpolated_grid_value'], 95) - np.percentile(data[selected_variable], 95)
+			std_bias = data['interpolated_grid_value'].std() - data[selected_variable].std()
 			wd = wasserstein_distance(data['interpolated_grid_value'], data[selected_variable])
+			ks_stat, ks_p = ks_2samp(data['interpolated_grid_value'], data[selected_variable])
+			cvm = cramervonmises_2samp(data['interpolated_grid_value'], data[selected_variable])
+			skew_bias = skew(data['interpolated_grid_value']) - skew(data[selected_variable])
+			kurtosis_bias = kurtosis(data['interpolated_grid_value']) - kurtosis(data[selected_variable])
 			
 			return pd.Series({
 				'Mean Bias': mean_bias,
@@ -804,7 +855,13 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 				'RMSE': rmse,
 				'Correlation': correlation,
 				'Variance Bias': variance_bias,
-				'Wasserstein Distance': wd
+				'Std Bias': std_bias,
+				'Wasserstein Distance': wd,
+				'KS test stat': ks_stat,
+				'KS test p': ks_p,
+				'Cramer–von Mises': cvm,
+				'Skew Bias': skew_bias,
+				'Kurtosis Bias': kurtosis_bias
 			})
 		
 		# Calcular métricas basadas en la variable seleccionada
@@ -822,7 +879,14 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 				'RMSE': '°C',
 				'Correlation': 'Dimensionless',
 				'Variance Bias': '°C²',
-				'Wasserstein Distance': 'Dimensionless'
+				'Std Bias': '°C',
+				'Wasserstein Distance': '',
+				'KS test stat': '',
+				'KS test p': '',
+				'Cramer–von Mises': '',
+				'Skew Bias': 'Dimensionless',
+				'Kurtosis Bias': 'Dimensionless'
+				
 			}
 
 		elif selected_variable == 'wind_speed':
@@ -839,7 +903,13 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 				'RMSE': 'm/s',
 				'Correlation': 'Dimensionless',
 				'Variance Bias': 'm²/s²',
-				'Wasserstein Distance': 'Dimensionless'
+				'Std Bias': 'm/s',
+				'Wasserstein Distance': '',
+				'KS test stat': '',
+				'KS test p': '',
+				'Cramer–von Mises': '',
+				'Skew Bias': 'Dimensionless',
+				'Kurtosis Bias': 'Dimensionless'
 			}
 		
 		elif selected_variable == 'radiation':
@@ -856,7 +926,13 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 				'RMSE': 'J/m²',
 				'Correlation': 'Dimensionless',
 				'Variance Bias': 'J²/m⁴',
-				'Wasserstein Distance': 'Dimensionless'
+				'Std Bias': 'J/m²',
+				'Wasserstein Distance': '',
+				'KS test stat': '',
+				'KS test p': '',
+				'Cramer–von Mises': '',
+				'Skew Bias': 'Dimensionless',
+				'Kurtosis Bias': 'Dimensionless'
 			}
 		
 		
@@ -885,7 +961,12 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 				'P10 relative Bias': '%',
 				'Multiplicative Bias': 'Dimensionless',
 				'Std Bias': 'mm',
-				'Wasserstein Distance': 'Dimensionless'
+				'Wasserstein Distance': '',
+				'KS test stat': '',
+				'KS test p': '',
+				'Cramer–von Mises': '',
+				'Skew Bias': 'Dimensionless',
+				'Kurtosis Bias': 'Dimensionless'
 			}
 			
 			# Calcular el número de días con precipitación observada mayor a 0.25 mm
@@ -932,7 +1013,13 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 				'RMSE': '%',
 				'Correlation': 'Dimensionless',
 				'Variance Bias': '%²',
-				'Wasserstein Distance': 'Dimensionless'
+				'Std Bias': '%',
+				'Wasserstein Distance': '',
+				'KS test stat': '',
+				'KS test p': '',
+				'Cramer–von Mises': '',
+				'Skew Bias': 'Dimensionless',
+				'Kurtosis Bias': 'Dimensionless'
 			}
 			
 		else:
@@ -1049,7 +1136,10 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 					c=merged_df[metric], cmap='viridis', s=100, edgecolor='k', transform=ccrs.PlateCarree()
 				)
 				# Configurar la barra de color
-				colorbar = plt.colorbar(scatter, ax=ax, label=f'{metric} ({units.get(metric, "")})')
+				if metric not in ['Wasserstein Distance', 'KS test stat', 'KS test p', 'Cramer–von Mises']
+					colorbar = plt.colorbar(scatter, ax=ax, label=f'{metric} ({units.get(metric, "")})')
+				else:
+					colorbar = plt.colorbar(scatter, ax=ax, label=f'{metric} {units.get(metric, "")}')
 				# Establecer límites de la barra de color si la métrica es SEEPS Skill Score
 				if metric == "SEEPS Skill Score":
 					scatter.set_clim(0, 1)
@@ -1097,7 +1187,10 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 		plt.figure(figsize=(10, 6))
 		sns.boxplot(data=metrics_concat, x='Grid', y=metric, hue=None, orient='v', dodge=False)
 		plt.title(f'Comparison of {metric} for {selected_variable}')
-		plt.ylabel(f'{metric} ({units.get(metric, "")})')
+		if metric not in ['Wasserstein Distance', 'KS test stat', 'KS test p', 'Cramer–von Mises']
+			plt.ylabel(f'{metric} ({units.get(metric, "")})')
+		else:
+			plt.ylabel(f'{metric} {units.get(metric, "")}')
 		plt.xlabel('Grid')
 		plt.xticks(rotation=45)
 		plt.tight_layout()
@@ -1250,4 +1343,4 @@ generate_button = ttk.Button(root, text='Generate Metrics & Plots', command=on_g
 generate_button.pack(pady=20)
 
 # Iniciar la interfaz gráfica
-root.mainloop()  
+root.mainloop()   
