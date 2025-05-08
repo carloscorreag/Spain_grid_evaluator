@@ -1136,7 +1136,7 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 					c=merged_df[metric], cmap='viridis', s=100, edgecolor='k', transform=ccrs.PlateCarree()
 				)
 				# Configurar la barra de color
-				if metric not in ['Wasserstein Distance', 'KS test stat', 'KS test p', 'Cramer–von Mises']
+				if metric not in ['Wasserstein Distance', 'KS test stat', 'KS test p', 'Cramer–von Mises']:
 					colorbar = plt.colorbar(scatter, ax=ax, label=f'{metric} ({units.get(metric, "")})')
 				else:
 					colorbar = plt.colorbar(scatter, ax=ax, label=f'{metric} {units.get(metric, "")}')
@@ -1187,7 +1187,7 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 		plt.figure(figsize=(10, 6))
 		sns.boxplot(data=metrics_concat, x='Grid', y=metric, hue=None, orient='v', dodge=False)
 		plt.title(f'Comparison of {metric} for {selected_variable}')
-		if metric not in ['Wasserstein Distance', 'KS test stat', 'KS test p', 'Cramer–von Mises']
+		if metric not in ['Wasserstein Distance', 'KS test stat', 'KS test p', 'Cramer–von Mises']:
 			plt.ylabel(f'{metric} ({units.get(metric, "")})')
 		else:
 			plt.ylabel(f'{metric} {units.get(metric, "")}')
