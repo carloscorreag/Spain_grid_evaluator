@@ -1262,6 +1262,10 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 		y = kde(x)
 		return x, y
 
+	# Si es precipitación, filtrar ceros o valores muy pequeños
+	if selected_variable == 'precipitation':
+		obs_all = obs_all[obs_all > 0.1]  # filtrar observaciones
+		
 	# Estimar PDF observaciones
 	x_obs, pdf_obs = estimate_pdf(obs_all)
 
@@ -1273,12 +1277,16 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 
 	# Graficar PDFs de reanálisis
 	for grid, data in rean_data.items():
+		if selected_variable == 'precipitation':
+			data = data[data > 0.1]  # filtrar grids también
 		x_r, pdf_r = estimate_pdf(data)
 		plt.plot(x_r, pdf_r, label=grid)
 
 	# Etiquetas
 	if selected_variable == 'precipitation':
 		plt.xlabel('Precipitation (mm)')
+		plt.xscale('log')   # o usar  plt.xlim(0, 10)
+		plt.ylim(0, None)
 	elif selected_variable == 'wind_speed':
 		plt.xlabel('Wind speed (m/s)')
 	elif selected_variable == 'humidity':
