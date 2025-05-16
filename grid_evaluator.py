@@ -7,7 +7,7 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 from scipy.interpolate import RegularGridInterpolator
-from scipy.stats import pearsonr, spearmanr, skew, kurtosis, ks_2samp, cramervonmises_2samp, wasserstein_distance
+from scipy.stats import pearsonr, spearmanr, skew, kurtosis, ks_2samp, wasserstein_distance, gaussian_kde
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 from pyproj import Proj, Transformer
@@ -286,9 +286,24 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 		values_to_remove = [-99,-99.9, -999,-999.9 -9999, -9999.9]
 		stations_data_0 = stations_data_0[~stations_data_0[selected_variable].isin(values_to_remove)]
 		
-		# Eliminar las estaciones con menos del 90% de completitud
-		stations_data_0 = stations_data_0[~stations_data_0['station_id'].isin(stations_to_remove)]
-		print(f"Se han eliminado las estaciones con menos del 90 por ciento de completitud: {len(stations_to_remove)} estaciones.")
+		# Configuración: activar o desactivar la eliminación de estaciones con completitud < 90%
+		remove_incomplete_stations = True
+		
+		if remove_incomplete_stations:
+			# Número de estaciones antes de eliminar
+			stations_before = stations_data_0['station_id'].nunique()
+			# Eliminar estaciones con menos del 90% de completitud
+			stations_data_0 = stations_data_0[~stations_data_0['station_id'].isin(stations_to_remove)]
+			# Número de estaciones después de eliminar
+			stations_after = stations_data_0['station_id'].nunique()
+			# Mostrar cuántas estaciones se eliminaron
+			print(f"{len(stations_to_remove)} stations with less than 90% completeness have been removed.")
+			# Verificar si no queda ninguna estación válida
+			if stations_after == 0:
+				raise ValueError("No valid stations remain after applying the completeness filter.")
+		else:
+			# Mensaje si no se aplica el filtro de completitud
+			print("No stations were removed (completeness filter disabled).")
 	
 	except FileNotFoundError:
 		print(f'Error - file not found: stations_data_{selected_variable}.csv')
@@ -550,6 +565,7 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 		#print(stations_data[~stations_data[selected_variable].apply(lambda x: isinstance(x, (int, float)))])
 		stations_data['interpolated_grid_value'] = pd.to_numeric(stations_data['interpolated_grid_value'], errors='coerce') # todos los valores se convierten a formato numérico
 		stations_data[selected_variable] = pd.to_numeric(stations_data[selected_variable], errors='coerce')
+		stations_data.to_csv(f'{selected_variable}_stations_data_and_interpolated_grid_value_{grid}.csv', index=False)
 		print('interpolation completed')
 		print('obtaining metrics...')
 		print('please wait')
@@ -576,7 +592,6 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 			std_bias = data['interpolated_grid_value'].std() - data[selected_variable].std()
 			wd = wasserstein_distance(data['interpolated_grid_value'], data[selected_variable])
 			ks_stat, ks_p = ks_2samp(data['interpolated_grid_value'], data[selected_variable])
-			cvm = cramervonmises_2samp(data['interpolated_grid_value'], data[selected_variable])
 			skew_bias = skew(data['interpolated_grid_value']) - skew(data[selected_variable])
 			kurtosis_bias = kurtosis(data['interpolated_grid_value']) - kurtosis(data[selected_variable])
 			
@@ -592,7 +607,6 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 				'Wasserstein Distance': wd,
 				'KS test stat': ks_stat,
 				'KS test p': ks_p,
-				'Cramer–von Mises': cvm,
 				'Skew Bias': skew_bias,
 				'Kurtosis Bias': kurtosis_bias
 			})
@@ -618,7 +632,6 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 			std_bias = data['interpolated_grid_value'].std() - data[selected_variable].std()
 			wd = wasserstein_distance(data['interpolated_grid_value'], data[selected_variable])
 			ks_stat, ks_p = ks_2samp(data['interpolated_grid_value'], data[selected_variable])
-			cvm = cramervonmises_2samp(data['interpolated_grid_value'], data[selected_variable])
 			skew_bias = skew(data['interpolated_grid_value']) - skew(data[selected_variable])
 			kurtosis_bias = kurtosis(data['interpolated_grid_value']) - kurtosis(data[selected_variable])
 			
@@ -635,7 +648,6 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 				'Wasserstein Distance': wd,
 				'KS test stat': ks_stat,
 				'KS test p': ks_p,
-				'Cramer–von Mises': cvm,
 				'Skew Bias': skew_bias,
 				'Kurtosis Bias': kurtosis_bias
 			})
@@ -661,7 +673,6 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 			std_bias = data['interpolated_grid_value'].std() - data[selected_variable].std()
 			wd = wasserstein_distance(data['interpolated_grid_value'], data[selected_variable])
 			ks_stat, ks_p = ks_2samp(data['interpolated_grid_value'], data[selected_variable])
-			cvm = cramervonmises_2samp(data['interpolated_grid_value'], data[selected_variable])
 			skew_bias = skew(data['interpolated_grid_value']) - skew(data[selected_variable])
 			kurtosis_bias = kurtosis(data['interpolated_grid_value']) - kurtosis(data[selected_variable])
 
@@ -679,7 +690,6 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 				'Wasserstein Distance': wd,
 				'KS test stat': ks_stat,
 				'KS test p': ks_p,
-				'Cramer–von Mises': cvm,
 				'Skew Bias': skew_bias,
 				'Kurtosis Bias': kurtosis_bias
 			})
@@ -756,7 +766,6 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 			
 			wd = wasserstein_distance(data['interpolated_grid_value'], data[selected_variable])
 			ks_stat, ks_p = ks_2samp(data['interpolated_grid_value'], data[selected_variable])
-			cvm = cramervonmises_2samp(data['interpolated_grid_value'], data[selected_variable])
 			skew_bias = skew(data['interpolated_grid_value']) - skew(data[selected_variable])
 			kurtosis_bias = kurtosis(data['interpolated_grid_value']) - kurtosis(data[selected_variable])
 			
@@ -816,7 +825,6 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 				'Wasserstein Distance': wd,
 				'KS test stat': ks_stat,
 				'KS test p': ks_p,
-				'Cramer–von Mises': cvm,
 				'Skew Bias': skew_bias,
 				'Kurtosis Bias': kurtosis_bias
 			})
@@ -842,7 +850,6 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 			std_bias = data['interpolated_grid_value'].std() - data[selected_variable].std()
 			wd = wasserstein_distance(data['interpolated_grid_value'], data[selected_variable])
 			ks_stat, ks_p = ks_2samp(data['interpolated_grid_value'], data[selected_variable])
-			cvm = cramervonmises_2samp(data['interpolated_grid_value'], data[selected_variable])
 			skew_bias = skew(data['interpolated_grid_value']) - skew(data[selected_variable])
 			kurtosis_bias = kurtosis(data['interpolated_grid_value']) - kurtosis(data[selected_variable])
 			
@@ -859,7 +866,6 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 				'Wasserstein Distance': wd,
 				'KS test stat': ks_stat,
 				'KS test p': ks_p,
-				'Cramer–von Mises': cvm,
 				'Skew Bias': skew_bias,
 				'Kurtosis Bias': kurtosis_bias
 			})
@@ -883,7 +889,6 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 				'Wasserstein Distance': '',
 				'KS test stat': '',
 				'KS test p': '',
-				'Cramer–von Mises': '',
 				'Skew Bias': 'Dimensionless',
 				'Kurtosis Bias': 'Dimensionless'
 				
@@ -891,8 +896,11 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 
 		elif selected_variable == 'wind_speed':
 			metrics_per_station_interpolated = stations_data.groupby('station_id').apply(calculate_metrics_interpolated_wspeed).reset_index()
+			print(metrics_per_station_interpolated)
+			
 			# Guardar métricas para cada estación en un csv
 			metrics_per_station_interpolated.to_csv('metrics_per_station_interpolated_' + grid + '_' + selected_variable + '.csv', index=False)
+			
 			print('metrics_per_station_interpolated_' + grid + '_' + selected_variable + '.csv has been saved')	
 			units = {
 				'Mean Bias': 'm/s',
@@ -907,7 +915,6 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 				'Wasserstein Distance': '',
 				'KS test stat': '',
 				'KS test p': '',
-				'Cramer–von Mises': '',
 				'Skew Bias': 'Dimensionless',
 				'Kurtosis Bias': 'Dimensionless'
 			}
@@ -930,7 +937,6 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 				'Wasserstein Distance': '',
 				'KS test stat': '',
 				'KS test p': '',
-				'Cramer–von Mises': '',
 				'Skew Bias': 'Dimensionless',
 				'Kurtosis Bias': 'Dimensionless'
 			}
@@ -964,7 +970,6 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 				'Wasserstein Distance': '',
 				'KS test stat': '',
 				'KS test p': '',
-				'Cramer–von Mises': '',
 				'Skew Bias': 'Dimensionless',
 				'Kurtosis Bias': 'Dimensionless'
 			}
@@ -1017,7 +1022,6 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 				'Wasserstein Distance': '',
 				'KS test stat': '',
 				'KS test p': '',
-				'Cramer–von Mises': '',
 				'Skew Bias': 'Dimensionless',
 				'Kurtosis Bias': 'Dimensionless'
 			}
@@ -1136,7 +1140,7 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 					c=merged_df[metric], cmap='viridis', s=100, edgecolor='k', transform=ccrs.PlateCarree()
 				)
 				# Configurar la barra de color
-				if metric not in ['Wasserstein Distance', 'KS test stat', 'KS test p', 'Cramer–von Mises']:
+				if metric not in ['Wasserstein Distance', 'KS test stat', 'KS test p']:
 					colorbar = plt.colorbar(scatter, ax=ax, label=f'{metric} ({units.get(metric, "")})')
 				else:
 					colorbar = plt.colorbar(scatter, ax=ax, label=f'{metric} {units.get(metric, "")}')
@@ -1187,7 +1191,7 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 		plt.figure(figsize=(10, 6))
 		sns.boxplot(data=metrics_concat, x='Grid', y=metric, hue=None, orient='v', dodge=False)
 		plt.title(f'Comparison of {metric} for {selected_variable}')
-		if metric not in ['Wasserstein Distance', 'KS test stat', 'KS test p', 'Cramer–von Mises']:
+		if metric not in ['Wasserstein Distance', 'KS test stat', 'KS test p']:
 			plt.ylabel(f'{metric} ({units.get(metric, "")})')
 		else:
 			plt.ylabel(f'{metric} {units.get(metric, "")}')
@@ -1228,6 +1232,72 @@ def generate_metrics_and_plots(selected_grids, selected_variable, start_year, en
 	plt.close()
 	print(f'{selected_variable}_annual_cycle_grids_comparison.png has been saved')
 	
+	# Acumuladores
+	all_obs = []
+	rean_data = {}
+
+	# Recorremos todos los grids
+	for grid in selected_grids:
+		filename = f'{selected_variable}_stations_data_and_interpolated_grid_value_{grid}.csv'
+		df = pd.read_csv(filename)
+
+		if selected_variable not in df.columns:
+			raise ValueError(f"Columna '{selected_variable}' no encontrada en {filename}")
+		if 'interpolated_grid_value' not in df.columns:
+			raise ValueError(f"Columna 'interpolated_grid_value' no encontrada en {filename}")
+
+		# Observaciones (se asume que son iguales en todos los archivos)
+		all_obs.append(df[selected_variable])
+
+		# Reanálisis
+		rean_data[grid] = df['interpolated_grid_value'].dropna().values
+
+	# Concatenar observaciones
+	obs_all = pd.concat(all_obs).dropna().values
+
+	# Funciones auxiliares
+	def estimate_pdf(data, bw_method='scott'):
+		kde = gaussian_kde(data, bw_method=bw_method)
+		x = np.linspace(np.min(data), np.max(data), 500)
+		y = kde(x)
+		return x, y
+
+	# Estimar PDF observaciones
+	x_obs, pdf_obs = estimate_pdf(obs_all)
+
+	# Crear figura
+	plt.figure(figsize=(10, 6))
+
+	# Graficar PDF de observaciones
+	plt.plot(x_obs, pdf_obs, label='Observations', color='black', linewidth=2)
+
+	# Graficar PDFs de reanálisis
+	for grid, data in rean_data.items():
+		x_r, pdf_r = estimate_pdf(data)
+		plt.plot(x_r, pdf_r, label=grid)
+
+	# Etiquetas
+	if selected_variable == 'precipitation':
+		plt.xlabel('Precipitation (mm)')
+	elif selected_variable == 'wind_speed':
+		plt.xlabel('Wind speed (m/s)')
+	elif selected_variable == 'humidity':
+		plt.xlabel('Humidity (%)')
+	elif selected_variable == 'radiation':
+		plt.xlabel('Radiation (J/m²)')
+	else:
+		plt.xlabel(selected_variable)
+
+	plt.ylabel('PDF')
+	plt.title('PDF comparison: Observations vs datasets')
+	plt.legend()
+	plt.grid(True)
+	plt.tight_layout()
+
+	# Guardar figura
+	plt.savefig(f'{selected_variable}_pdf_comparison_stations_vs_datasets.png', dpi=300)
+	plt.close()
+
 	
 def on_generate_button_click():
 	selected_variables = [combo_variable.get()]
