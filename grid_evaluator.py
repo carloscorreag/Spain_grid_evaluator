@@ -1331,7 +1331,7 @@ def on_generate_button_click():
 	generate_metrics_and_plots(selected_grids, selected_variables[0], int(start_year), int(end_year), selected_months, interpolation_method)
 	
 # Variables y lista de rejillas
-variables = ['temperature', 'maximum_temperature', 'minimum_temperature', 'precipitation', 'wind_speed', 'humidity']
+variables = ['temperature', 'maximum_temperature', 'minimum_temperature', 'precipitation', 'wind_speed', 'humidity', 'radiation']
 grids = ['HCLIM_IBERIAxm_40', 'HCLIM_IBERIAxxm_40', 'HCLIM_IBERIAxxs_10', 'WRF', 'ISIMIP-CHELSA', 'CHIRTS', 'CHIRPS', 'ERA5', 'ERA5-Land', 'COSMO-REA6', 'CERRA', 'CERRA_LAND', 'EOBS', 'EOBS_HR', 'EOBS_LR', 'CLARA-A3']
 months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 
